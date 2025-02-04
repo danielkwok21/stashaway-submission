@@ -36,11 +36,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				ScheduledTransactions: []ScheduledTransaction{
 					{
 						PortfolioID: 1,
-						Amount:      10000,
+						Amount:      1000000,
 					},
 					{
 						PortfolioID: 2,
-						Amount:      500,
+						Amount:      50000,
 					},
 				},
 			},
@@ -53,13 +53,14 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 					},
 					{
 						PortfolioID: 2,
-						Amount:      100,
+						Amount:      10000,
 					},
 				},
 			},
 		}
 	)
 
+	// here are all the test cases we're testing against this function
 	testCases := []TestCase{
 		{
 			name: "Original from assignment",
@@ -69,11 +70,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        10500,
+						Amount:        1050000,
 					},
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        100,
+						Amount:        10000,
 					},
 				},
 			},
@@ -81,12 +82,12 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      1,
 					Name:    "High risk",
-					Balance: 10000,
+					Balance: 1000000,
 				},
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 600,
+					Balance: 60000,
 				},
 			},
 		},
@@ -98,7 +99,7 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        10500,
+						Amount:        1050000,
 					},
 				},
 			},
@@ -106,12 +107,12 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      1,
 					Name:    "High risk",
-					Balance: 10000,
+					Balance: 1000000,
 				},
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 500,
+					Balance: 50000,
 				},
 			},
 		},
@@ -123,7 +124,7 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        10501,
+						Amount:        1050100,
 					},
 				},
 			},
@@ -131,12 +132,12 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      1,
 					Name:    "High risk",
-					Balance: 10000,
+					Balance: 1000000,
 				},
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 501,
+					Balance: 50100,
 				},
 			},
 		},
@@ -150,11 +151,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 						ScheduledTransactions: []ScheduledTransaction{
 							{
 								PortfolioID: 1,
-								Amount:      4000,
+								Amount:      4000000,
 							},
 							{
 								PortfolioID: 2,
-								Amount:      1000,
+								Amount:      1000000,
 							},
 						},
 					},
@@ -167,7 +168,7 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 							},
 							{
 								PortfolioID: 2,
-								Amount:      100,
+								Amount:      10000,
 							},
 						},
 					},
@@ -175,7 +176,7 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        100,
+						Amount:        1000000,
 					},
 				},
 			},
@@ -183,12 +184,12 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      1,
 					Name:    "High risk",
-					Balance: 80,
+					Balance: 800000,
 				},
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 20,
+					Balance: 200000,
 				},
 			},
 		},
@@ -202,11 +203,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 						ScheduledTransactions: []ScheduledTransaction{
 							{
 								PortfolioID: 1,
-								Amount:      10000,
+								Amount:      1000000,
 							},
 							{
 								PortfolioID: 2,
-								Amount:      500,
+								Amount:      50000,
 							},
 						},
 					},
@@ -215,11 +216,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 						ScheduledTransactions: []ScheduledTransaction{
 							{
 								PortfolioID: 1,
-								Amount:      400,
+								Amount:      40000,
 							},
 							{
 								PortfolioID: 2,
-								Amount:      100,
+								Amount:      10000,
 							},
 						},
 					},
@@ -227,11 +228,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        11000, // this simulates the first deposit that'll cover everything
+						Amount:        1100000, // this simulates the first deposit that'll cover everything
 					},
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        500, // this simulates the extra amount that should be distributed proportionately
+						Amount:        50000, // this simulates the extra amount that should be distributed proportionately
 					},
 				},
 			},
@@ -239,12 +240,12 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      1,
 					Name:    "High risk",
-					Balance: 10800,
+					Balance: 1080000,
 				},
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 700,
+					Balance: 70000,
 				},
 			},
 		},
@@ -258,11 +259,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 						ScheduledTransactions: []ScheduledTransaction{
 							{
 								PortfolioID: 1,
-								Amount:      10000,
+								Amount:      950000,
 							},
 							{
 								PortfolioID: 2,
-								Amount:      500,
+								Amount:      50000,
 							},
 						},
 					},
@@ -271,11 +272,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 						ScheduledTransactions: []ScheduledTransaction{
 							{
 								PortfolioID: 1,
-								Amount:      400,
+								Amount:      40000,
 							},
 							{
 								PortfolioID: 2,
-								Amount:      100,
+								Amount:      10000,
 							},
 						},
 					},
@@ -283,11 +284,11 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        11000, // this simulates the first deposit that'll cover everything
+						Amount:        1050000, // this simulates the first deposit that'll cover everything
 					},
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        501, // this simulates the extra amount that should be distributed proportionately + remainder
+						Amount:        1000, // this simulates the extra amount that should be distributed proportionately + remainder
 					},
 				},
 			},
@@ -295,12 +296,12 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      1,
 					Name:    "High risk",
-					Balance: 10801,
+					Balance: 990800,
 				},
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 700,
+					Balance: 60200,
 				},
 			},
 		},

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"math"
+	"sort"
 )
 
 // DepositPlan represents either onetime / monthly deposits to various portfolios
@@ -20,81 +21,36 @@ const (
 
 // ScheduledTransaction specifies a portfolio's expected deposit amount
 type ScheduledTransaction struct {
-	// Favouring using name instead of ID for the sake of simplicity here. IRL this will be a table, and all relations will be managed with IDs
-	PortfolioName string
-	Amount        int
+	PortfolioID int
+	Amount      int
 }
 
+// Deposit is the deposit we receive from bank
 type Deposit struct {
 	ReferenceCode string
 	Amount        int
 }
 
 type Portfolio struct {
-	PortfolioName string
-	Balance       int
+	ID      int
+	Name    string
+	Balance int
 }
 
-func main() {
-	depositPlans := []DepositPlan{
-		{
-			Type: DepositPlanType_OneTime,
-			ScheduledTransactions: []ScheduledTransaction{
-				{
-					PortfolioName: "High risk",
-					Amount:        10000,
-				},
-				{
-					PortfolioName: "Retirement",
-					Amount:        500,
-				},
-			},
-		},
-		{
-			Type: DepositPlanType_Monthly,
-			ScheduledTransactions: []ScheduledTransaction{
-				{
-					PortfolioName: "High risk",
-					Amount:        10,
-				},
-				{
-					PortfolioName: "Retirement",
-					Amount:        100,
-				},
-			},
-		},
+func GetPortfolioFinalAmount(portfolios []Portfolio, depositPlans []DepositPlan, deposits []Deposit) []Portfolio {
+	// organise portfolio by id for easy read/write
+	portfolioByID := map[int]Portfolio{}
+	for _, portfolio := range portfolios {
+		portfolioByID[portfolio.ID] = portfolio
 	}
 
-	deposits := []Deposit{
-		{
-			ReferenceCode: "YN5XWAAQ",
-			Amount:        10500,
-		},
-		{
-			ReferenceCode: "YN5XWAAQ",
-			Amount:        100,
-		},
-		{
-			ReferenceCode: "YN5XWAAQ",
-			Amount:        100,
-		},
+	// calculate the total amount of deposit we've received
+	totalAmountReceived := 0
+	for _, deposit := range deposits {
+		totalAmountReceived += deposit.Amount
 	}
 
-	result := getPortfolioFinalAmount(depositPlans, deposits)
-	fmt.Println(result)
-}
-
-func getPortfolioFinalAmount(depositPlans []DepositPlan, deposits []Deposit) []Portfolio {
-	portfolioByName := map[string]Portfolio{}
-	for _, depositPlan := range depositPlans {
-		for _, tx := range depositPlan.ScheduledTransactions {
-			portfolioByName[tx.PortfolioName] = Portfolio{
-				PortfolioName: tx.PortfolioName,
-				Balance:       0,
-			}
-		}
-	}
-
+	// separate out one time vs monthly deposits as we'll process one time deposits first
 	var oneTimeDepositPlan DepositPlan
 	var monthlyDepositPlan DepositPlan
 	for _, depositPlan := range depositPlans {
@@ -108,72 +64,97 @@ func getPortfolioFinalAmount(depositPlans []DepositPlan, deposits []Deposit) []P
 		}
 	}
 
-	totalAmountReceived := 0
-	for _, deposit := range deposits {
-		totalAmountReceived += deposit.Amount
-	}
+	// currentAmount will set to total amount first, and slowly be deducted as we allocate to different funds
+	currentAmount := totalAmountReceived
+
+	// first we handle one time deposits
 	for _, scheduledTransaction := range oneTimeDepositPlan.ScheduledTransactions {
-		if totalAmountReceived <= 0 {
+		if currentAmount <= 0 {
 			break
 		}
-		portfolio := portfolioByName[scheduledTransaction.PortfolioName]
 
-		if totalAmountReceived < scheduledTransaction.Amount {
-			portfolio.Balance += totalAmountReceived
-			totalAmountReceived = 0
+		// find the portfolio this scheduled transaction is targeting
+		portfolio := portfolioByID[scheduledTransaction.PortfolioID]
+
+		// in case the amount we have left is less than the amount we need, credit what ever is left to this portfolio
+		if currentAmount < scheduledTransaction.Amount {
+			portfolio.Balance += currentAmount
+			currentAmount = 0
 		} else {
+			// else update balance according to scheduled transactions
 			portfolio.Balance += scheduledTransaction.Amount
-			totalAmountReceived -= scheduledTransaction.Amount
+			currentAmount -= scheduledTransaction.Amount
 		}
 
-		portfolioByName[scheduledTransaction.PortfolioName] = portfolio
+		// persist updated portfolio
+		portfolioByID[scheduledTransaction.PortfolioID] = portfolio
 	}
+
+	// then we handle monthly deposits
 	for _, scheduledTransaction := range monthlyDepositPlan.ScheduledTransactions {
-		if totalAmountReceived <= 0 {
+		if currentAmount <= 0 {
 			break
 		}
-		portfolio := portfolioByName[scheduledTransaction.PortfolioName]
 
-		if totalAmountReceived < scheduledTransaction.Amount {
+		// find the portfolio this scheduled transaction is targeting
+		portfolio := portfolioByID[scheduledTransaction.PortfolioID]
+
+		// in case the amount we have left is less than the amount we need, credit what ever is left to this portfolio
+		if currentAmount < scheduledTransaction.Amount {
 			portfolio.Balance += totalAmountReceived
-			totalAmountReceived = 0
+			currentAmount = 0
 		} else {
+			// else update balance according to scheduled transactions
 			portfolio.Balance += scheduledTransaction.Amount
-			totalAmountReceived -= scheduledTransaction.Amount
+			currentAmount -= scheduledTransaction.Amount
 		}
 
-		portfolioByName[scheduledTransaction.PortfolioName] = portfolio
+		// persist updated portfolio
+		portfolioByID[scheduledTransaction.PortfolioID] = portfolio
 	}
 
-	// handle remaining, distribute proportionally
-	if totalAmountReceived > 0 {
+	// if there's money left,  distribute proportionally
+	if currentAmount > 0 {
+		leftoverAmount := currentAmount
+		// used to calculate proportion later
 		totalScheduledTransactionAmount := 0
-		scheduledTransactionByPortfolioName := map[string]ScheduledTransaction{}
+		// create a map for easy read/write
+		scheduledTransactionByPortfolioID := map[int]ScheduledTransaction{}
 		for _, scheduledTransaction := range monthlyDepositPlan.ScheduledTransactions {
 			totalScheduledTransactionAmount += scheduledTransaction.Amount
 
-			scheduledTransactionByPortfolioName[scheduledTransaction.PortfolioName] = scheduledTransaction
+			scheduledTransactionByPortfolioID[scheduledTransaction.PortfolioID] = scheduledTransaction
 		}
 
-		for _, portfolio := range portfolioByName {
-			scheduledTransaction := scheduledTransactionByPortfolioName[portfolio.PortfolioName]
-			proportionalAmount := totalAmountReceived * scheduledTransaction.Amount / totalScheduledTransactionAmount
+		for _, portfolio := range portfolioByID {
+			// figure out what's the proportionate amount this portfolio should receive
+			scheduledTransaction := scheduledTransactionByPortfolioID[portfolio.ID]
+			proportion := float64(scheduledTransaction.Amount) / float64(totalScheduledTransactionAmount)
+			proportionalAmount := int(math.Floor(float64(leftoverAmount) * proportion))
 
 			portfolio.Balance += proportionalAmount
-			portfolioByName[portfolio.PortfolioName] = portfolio
-			totalAmountReceived -= proportionalAmount
+			currentAmount -= proportionalAmount
+
+			portfolioByID[portfolio.ID] = portfolio
 		}
 	}
 
-	var portfolios []Portfolio
-	for _, portfolio := range portfolioByName {
-		portfolios = append(portfolios, portfolio)
+	// turn out map into array to return as result
+	var result []Portfolio
+	for _, portfolio := range portfolioByID {
+		result = append(result, portfolio)
 	}
 
-	// if there's still amount left, usually due to division math remainder
-	if totalAmountReceived > 0 {
-		portfolios[0].Balance += totalAmountReceived
+	// sort by ID desc for consistent testing
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ID < result[j].ID
+	})
+
+	// if there's still amount left, usually due to division math remainder. just create to the first portfolio
+	if currentAmount > 0 {
+		result[0].Balance += currentAmount
+		currentAmount -= currentAmount
 	}
 
-	return portfolios
+	return result
 }

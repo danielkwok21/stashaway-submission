@@ -45,9 +45,9 @@ func GetPortfolioFinalAmount(portfolios []Portfolio, depositPlans []DepositPlan,
 	}
 
 	// calculate the total amount of deposit we've received
-	totalAmountReceived := 0
+	totalDepositedAmount := 0
 	for _, deposit := range deposits {
-		totalAmountReceived += deposit.Amount
+		totalDepositedAmount += deposit.Amount
 	}
 
 	// separate out one time vs monthly deposits as we'll process one time deposits first
@@ -64,78 +64,110 @@ func GetPortfolioFinalAmount(portfolios []Portfolio, depositPlans []DepositPlan,
 		}
 	}
 
-	// currentAmount will set to total amount first, and slowly be deducted as we allocate to different funds
-	currentAmount := totalAmountReceived
-
-	// first we handle one time deposits
+	// calculate the total we need for onetime deposit
+	oneTimeDepositExpectedAmount := 0
 	for _, scheduledTransaction := range oneTimeDepositPlan.ScheduledTransactions {
-		if currentAmount <= 0 {
-			break
-		}
-
-		// find the portfolio this scheduled transaction is targeting
-		portfolio := portfolioByID[scheduledTransaction.PortfolioID]
-
-		// in case the amount we have left is less than the amount we need, credit what ever is left to this portfolio
-		if currentAmount < scheduledTransaction.Amount {
-			portfolio.Balance += currentAmount
-			currentAmount = 0
-		} else {
-			// else update balance according to scheduled transactions
-			portfolio.Balance += scheduledTransaction.Amount
-			currentAmount -= scheduledTransaction.Amount
-		}
-
-		// persist updated portfolio
-		portfolioByID[scheduledTransaction.PortfolioID] = portfolio
+		oneTimeDepositExpectedAmount += scheduledTransaction.Amount
 	}
 
-	// then we handle monthly deposits
+	// calculate the total we need for monthly deposit
+	monthlyDepositExpectedAmount := 0
 	for _, scheduledTransaction := range monthlyDepositPlan.ScheduledTransactions {
-		if currentAmount <= 0 {
-			break
-		}
-
-		// find the portfolio this scheduled transaction is targeting
-		portfolio := portfolioByID[scheduledTransaction.PortfolioID]
-
-		// in case the amount we have left is less than the amount we need, credit what ever is left to this portfolio
-		if currentAmount < scheduledTransaction.Amount {
-			portfolio.Balance += totalAmountReceived
-			currentAmount = 0
-		} else {
-			// else update balance according to scheduled transactions
-			portfolio.Balance += scheduledTransaction.Amount
-			currentAmount -= scheduledTransaction.Amount
-		}
-
-		// persist updated portfolio
-		portfolioByID[scheduledTransaction.PortfolioID] = portfolio
+		monthlyDepositExpectedAmount += scheduledTransaction.Amount
 	}
 
-	// if there's money left,  distribute proportionally
-	if currentAmount > 0 {
-		leftoverAmount := currentAmount
-		// used to calculate proportion later
-		totalScheduledTransactionAmount := 0
-		// create a map for easy read/write
-		scheduledTransactionByPortfolioID := map[int]ScheduledTransaction{}
-		for _, scheduledTransaction := range monthlyDepositPlan.ScheduledTransactions {
-			totalScheduledTransactionAmount += scheduledTransaction.Amount
+	// figure out how much we have to allocate for one time deposit, monthly deposit, and (if any) remaining
+	onetimeDepositAmount, monthlyDepositAmount, remainder := getAmounts(
+		totalDepositedAmount,
+		oneTimeDepositExpectedAmount,
+		monthlyDepositExpectedAmount,
+	)
 
-			scheduledTransactionByPortfolioID[scheduledTransaction.PortfolioID] = scheduledTransaction
+	if onetimeDepositAmount < oneTimeDepositExpectedAmount {
+		// if insufficient, split proportionately across all portfolio
+		remainingAmount := onetimeDepositAmount
+		for _, scheduledTransaction := range oneTimeDepositPlan.ScheduledTransactions {
+			proportion := float64(scheduledTransaction.Amount) / float64(oneTimeDepositExpectedAmount)
+			proportionalAmount := int(math.Floor(float64(onetimeDepositAmount) * proportion))
+
+			portfolio := portfolioByID[scheduledTransaction.PortfolioID]
+			portfolio.Balance += proportionalAmount
+			portfolioByID[portfolio.ID] = portfolio
+
+			remainingAmount -= proportionalAmount
 		}
 
-		for _, portfolio := range portfolioByID {
-			// figure out what's the proportionate amount this portfolio should receive
-			scheduledTransaction := scheduledTransactionByPortfolioID[portfolio.ID]
-			proportion := float64(scheduledTransaction.Amount) / float64(totalScheduledTransactionAmount)
-			proportionalAmount := int(math.Floor(float64(leftoverAmount) * proportion))
-
-			portfolio.Balance += proportionalAmount
-			currentAmount -= proportionalAmount
-
+		// remaining is possible as we're doing monetary division. just give it to the first portfolio as the amount is insignificant
+		if remainingAmount > 0 {
+			portfolioID := oneTimeDepositPlan.ScheduledTransactions[0].PortfolioID
+			portfolio := portfolioByID[portfolioID]
+			portfolio.Balance += remainingAmount
 			portfolioByID[portfolio.ID] = portfolio
+
+			remainingAmount = 0
+		}
+	} else {
+		// else just split according to amount specified in transaction
+		for _, scheduledTransaction := range oneTimeDepositPlan.ScheduledTransactions {
+			portfolio := portfolioByID[scheduledTransaction.PortfolioID]
+			portfolio.Balance += scheduledTransaction.Amount
+			portfolioByID[portfolio.ID] = portfolio
+		}
+	}
+
+	if monthlyDepositAmount < monthlyDepositExpectedAmount {
+		// if insufficient, split proportionately across all portfolio
+		remainingAmount := monthlyDepositAmount
+		for _, scheduledTransaction := range monthlyDepositPlan.ScheduledTransactions {
+			proportion := float64(scheduledTransaction.Amount) / float64(monthlyDepositExpectedAmount)
+			proportionalAmount := int(math.Floor(float64(monthlyDepositAmount) * proportion))
+
+			portfolio := portfolioByID[scheduledTransaction.PortfolioID]
+			portfolio.Balance += proportionalAmount
+			portfolioByID[portfolio.ID] = portfolio
+
+			remainingAmount -= proportionalAmount
+		}
+
+		// remaining is possible as we're doing monetary division. just give it to the first portfolio as the amount is insignificant
+		if remainingAmount > 0 {
+			portfolioID := monthlyDepositPlan.ScheduledTransactions[0].PortfolioID
+			portfolio := portfolioByID[portfolioID]
+			portfolio.Balance += remainingAmount
+			portfolioByID[portfolio.ID] = portfolio
+
+			remainingAmount = 0
+		}
+	} else {
+		// else just split according to amount specified in transaction
+		for _, scheduledTransaction := range monthlyDepositPlan.ScheduledTransactions {
+			portfolio := portfolioByID[scheduledTransaction.PortfolioID]
+			portfolio.Balance += scheduledTransaction.Amount
+			portfolioByID[portfolio.ID] = portfolio
+		}
+	}
+
+	// split remainder amount proportionately across monthly deposits
+	if remainder > 0 {
+		remainingAmount := remainder
+		for _, scheduledTransaction := range monthlyDepositPlan.ScheduledTransactions {
+			proportion := float64(scheduledTransaction.Amount) / float64(monthlyDepositExpectedAmount)
+			proportionalAmount := int(math.Floor(float64(remainder) * proportion))
+
+			portfolio := portfolioByID[scheduledTransaction.PortfolioID]
+			portfolio.Balance += proportionalAmount
+			portfolioByID[portfolio.ID] = portfolio
+
+			remainingAmount -= proportionalAmount
+		}
+
+		if remainingAmount > 0 {
+			portfolioID := monthlyDepositPlan.ScheduledTransactions[0].PortfolioID
+			portfolio := portfolioByID[portfolioID]
+			portfolio.Balance += remainingAmount
+			portfolioByID[portfolio.ID] = portfolio
+
+			remainingAmount = 0
 		}
 	}
 
@@ -150,11 +182,35 @@ func GetPortfolioFinalAmount(portfolios []Portfolio, depositPlans []DepositPlan,
 		return result[i].ID < result[j].ID
 	})
 
-	// if there's still amount left, usually due to division math remainder. just create to the first portfolio
-	if currentAmount > 0 {
-		result[0].Balance += currentAmount
-		currentAmount -= currentAmount
+	return result
+}
+
+func getAmounts(totalDepositedAmount int, oneTimeDepositExpectedAmount int, monthlyDepositExpectedAmount int) (amountForOnetimeDeposit int, amountForMonthlyDeposit int, remainder int) {
+	// if not deposit provided
+	if totalDepositedAmount == 0 {
+		return 0, 0, 0
 	}
 
-	return result
+	// if not even sufficient for one time deposit plan
+	if totalDepositedAmount < oneTimeDepositExpectedAmount {
+		return totalDepositedAmount, 0, 0
+	}
+
+	totalExpectedAmount := oneTimeDepositExpectedAmount + monthlyDepositExpectedAmount
+	// if not sufficient for all deposit plans
+	if totalDepositedAmount < totalExpectedAmount {
+		amountForMonthlyDepositPlan := totalDepositedAmount - oneTimeDepositExpectedAmount
+
+		return totalDepositedAmount, amountForMonthlyDepositPlan, 0
+	}
+
+	// if there's extra
+	if totalDepositedAmount > totalExpectedAmount {
+		remainder = totalDepositedAmount - totalExpectedAmount
+
+		return totalDepositedAmount, monthlyDepositExpectedAmount, remainder
+	}
+
+	// if deposit provided is the exact amount required by all deposit plans
+	return oneTimeDepositExpectedAmount, monthlyDepositExpectedAmount, 0
 }

@@ -98,32 +98,7 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
-						Amount:        9999,
-					},
-				},
-			},
-			expect: []Portfolio{
-				{
-					ID:      1,
-					Name:    "High risk",
-					Balance: 9999,
-				},
-				{
-					ID:      2,
-					Name:    "Retirement",
-					Balance: 0,
-				},
-			},
-		},
-		{
-			name: "Insufficient amount deposited, should prioritise one-time deposits. If any remain, credit to monthly deposits",
-			input: Input{
-				portfolios:   portfolios,
-				depositPlans: depositPlans,
-				deposits: []Deposit{
-					{
-						ReferenceCode: "YN5XWAAQ",
-						Amount:        10001,
+						Amount:        10500,
 					},
 				},
 			},
@@ -136,15 +111,67 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 1,
+					Balance: 500,
+				},
+			},
+		},
+		{
+			name: "Insufficient amount deposited, should prioritise one-time deposits. If any remain, credit to monthly deposits",
+			input: Input{
+				portfolios:   portfolios,
+				depositPlans: depositPlans,
+				deposits: []Deposit{
+					{
+						ReferenceCode: "YN5XWAAQ",
+						Amount:        10501,
+					},
+				},
+			},
+			expect: []Portfolio{
+				{
+					ID:      1,
+					Name:    "High risk",
+					Balance: 10000,
+				},
+				{
+					ID:      2,
+					Name:    "Retirement",
+					Balance: 501,
 				},
 			},
 		},
 		{
 			name: "Insufficient amount deposited (for even a single scheduled transaction). Just deposit whatever we have proportionately to one time deposits",
 			input: Input{
-				portfolios:   portfolios,
-				depositPlans: depositPlans,
+				portfolios: portfolios,
+				depositPlans: []DepositPlan{
+					{
+						Type: DepositPlanType_OneTime,
+						ScheduledTransactions: []ScheduledTransaction{
+							{
+								PortfolioID: 1,
+								Amount:      4000,
+							},
+							{
+								PortfolioID: 2,
+								Amount:      1000,
+							},
+						},
+					},
+					{
+						Type: DepositPlanType_Monthly,
+						ScheduledTransactions: []ScheduledTransaction{
+							{
+								PortfolioID: 1,
+								Amount:      0,
+							},
+							{
+								PortfolioID: 2,
+								Amount:      100,
+							},
+						},
+					},
+				},
 				deposits: []Deposit{
 					{
 						ReferenceCode: "YN5XWAAQ",
@@ -156,12 +183,12 @@ func Test_GetPortfolioFinalAmount(t *testing.T) {
 				{
 					ID:      1,
 					Name:    "High risk",
-					Balance: 95,
+					Balance: 80,
 				},
 				{
 					ID:      2,
 					Name:    "Retirement",
-					Balance: 5,
+					Balance: 20,
 				},
 			},
 		},
